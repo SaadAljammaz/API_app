@@ -9,13 +9,16 @@ from models import setup_db, Question, Category
 QUESTIONS_PER_PAGE = 10
 
 def paginate_questions(request, selection):
-  page = request.args.get('page', 1, type=int)
-  start = (page - 1) * QUESTIONS_PER_PAGE
-  end = start + QUESTIONS_PER_PAGE
-  questions = [question.format() for question in selection]
-  current_questions = questions[start:end]
+  try:
+    page = request.args.get('page', 1, type=int)
+    start = (page - 1) * QUESTIONS_PER_PAGE
+    end = start + QUESTIONS_PER_PAGE
+    questions = [question.format() for question in selection]
+    current_questions = questions[start:end]
 
-  return current_questions
+    return current_questions
+  except:
+    abort(404)
 
 def create_app(test_config=None):
   # create and configure the app
@@ -71,12 +74,15 @@ def create_app(test_config=None):
       allQuestions = Question.query.all()
       questions = paginate_questions(request,allQuestions)
       category = Category.query.all()
+      if len(questions) == 0:
+        abort(404)
       categories = []
       for i in category:
         categories.append(i.type)
       current_category = None
       number_of_total_questions = len(allQuestions)
       return jsonify({
+        'success': True,
         'total_questions': number_of_total_questions,
         'current_category': current_category,
         'categories': categories,
@@ -125,7 +131,6 @@ def create_app(test_config=None):
         'success': True,
         'message': message
       })
-
     except:
       abort(422)
 
@@ -144,7 +149,10 @@ def create_app(test_config=None):
     try:
       body = request.get_json()
       allQuestions = Question.query.filter(Question.question.ilike(f'%{body["searchTerm"]}%')).all()
+      if not body["searchTerm"] or not allQuestions:
+        abort(404)
       return jsonify({
+        'success': True,
         'questions': [question.format() for question in allQuestions],
       })
     except:
@@ -161,13 +169,12 @@ def create_app(test_config=None):
   @app.route('/categories/<int:category>/questions')
   def get_category_questions(category):
     try:
-      newCategory = category
-      allQuestions = Question.query.filter_by(category = newCategory).all()
+      newCategory = Category.query.get(category)
+      allQuestions = Question.query.filter_by(category = category).all()
       return jsonify({
         'success': True,
         'questions': [question.format() for question in allQuestions],
-        'total_questions': len(allQuestions),
-        'category_name': category
+        'category_name': newCategory.type
       })
     except:
       abort(404)
